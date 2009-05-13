@@ -1,0 +1,220 @@
+.TH tac_plus 8 "10 February 1995"
+.SH NAME
+tac_plus \- tacacs plus daemon
+.SH SYNOPSIS
+.B tac_plus
+.B \-C\ <configfile>
+[
+.B \-t
+] [
+.B \-P
+] [
+.B \-g
+] [
+.B \-i
+] [
+.B \-v
+] [
+.B \-L
+] [
+.B \-p port
+] [
+.B \-d level
+]
+.SH DESCRIPTION
+tac_plus listens on tcp port
+.B
+49 
+and provides Cisco systems routers and access servers with
+authentication, authorisation and accounting services.
+.LP
+A configuration file controls the details of authentication,
+authorisation and accounting.
+.LP
+On startup, tac_plus creates the file
+.B /etc/tac_plus.pid ,
+if possible, containing its process id.
+.LP
+.SH ARGUMENTS and OPTIONS
+.TP
+.B \-C <configfile>
+.IP
+Specify the configuration file name. A configuration file is
+.B
+always required.
+.TP 
+.B \-P
+Just parse the configuration file, echoing it to standard output while
+parsing, and then exit. Used for debugging configuration file syntax.
+.TP
+.B \-t
+Log all informational, debugging or error messages to
+.B
+/dev/console 
+in addition to logging to syslogd. Useful for debugging.
+.IP
+.B
+NOTE: 
+messages at priority LOG_DEBUG are never logged to syslog, Use the
+.B
+\-t, \-d or \-g 
+flags to see all messages produced by tac_plus.  These flags
+should not be used in normal service.
+.TP
+.B \-g
+Go into single threaded mode, only accepting and servicing a single
+connection at a time without forking and without closing file
+descriptors.  Print all messages to standard output. For debugging
+only. Don't ever try to deliver normal service this way.
+.TP
+.B \-v
+Print the current version of tac_plus to stdout and then exit.
+.TP
+.B \-L
+Lookup the hostname of the client sending requests and use if for
+logging, instead of just using its ip address.
+.TP
+.B \-p <port>
+Use the specified port number instead of the default port
+.B
+49 
+for incoming tcp connections. Note that this changes the name of the
+pid file created by the daemon, which will append the port number to
+the file name if the port is not the default one.
+.TP
+.B \-d <level>
+Switch on debugging and write debug output into
+.B
+/var/tmp/tac_plus.log. 
+
+See the definitions of debugging flags at the bottom of tac_plus.h for
+available flags and their meanings.  Most flags cause extra messages
+to be sent to 
+.B
+/var/tmp/tac_plus.log 
+and also to 
+.B
+syslog.
+.IP
+.B
+NOTE: 
+The 
+.B
+\-g 
+flag will cause these messages to also appear on stdout.  The
+.B
+\-t 
+flag will cause these messages to also be written to /dev/console.
+.IP
+The values represent bits, so they can be added together. Currently
+the following values are recognised:
+.nf
+
+Value   Meaning
+8       authorisation debugging
+16      authentication debugging
+32      password file processing debugging
+64      accounting debugging
+128     config file parsing & lookup
+256     packet transmission/reception
+512     encryption/decryption
+1024    MD5 hash algorithm debugging
+2048    very low level encryption/decryption
+
+.fi
+.TP
+.B \-i
+Run under inetd instead of running standalone. Under inetd, the config
+file is parsed every time tac_plus starts up, so this is very
+inefficient if the config file is large or there are many incoming
+connections. The standalone version only reads the config file once at
+startup.
+.IP
+If the config file is small, and you don't have very frequent incoming
+connections, and authentication is being done via passwd(5) files or
+SKEY (which are not cached), running under inetd should be tolerable,
+but still isn't recommended.
+.TP
+\-s
+.IP
+The \-s flag will cause the daemon to always reject authentication
+requests which contain a minor version number of zero (SENDPASS).  You
+can do this only if all your NASes are running an IOS version of 11.2
+or later.
+.IP
+This enhances security in the event that someone discovers your
+encryption key.  SENDPASS requests permits requestors to obtain chap,
+pap and arap passwords from your daemon, if (and only if) they know
+your encryption key.
+.LP
+.SH INVOKING TAC_PLUS
+.LP
+Tac_plus is normally invoked by root, as follows:
+.LP
+
+    # tac_plus -C <configfile>
+
+.LP
+where <configfile> is a full path to the configuration file. Tac_plus
+will background itself and start listening on port 49 for incoming tcp
+connections.
+.LP
+Tac_plus must be invoked as root to obtain privileged network socket
+49 and to read the protected configuration file which may contain
+confidential information such as encryption keys and cleartext
+passwords.
+.LP
+After the port is acquired and the config file is read, root
+privileges are no longer required.  You can arrange that tac_plus will
+change its user and groupid to more innocuous user and group (see the
+Makefile for instructions on how to do compile this) when
+appropriate.
+.LP
+.B
+NOTE:
+The new user and group still needs permission to read any
+passwd(5) files and S/KEY database if these are being used.
+.SH CONFIGURATION FILE PERMISSIONS
+.LP
+It goes without saying (though I say it here) that the configuration
+file should be unreadable and unwriteable by anyone except root, as it
+contains passwords and keys.
+.SH UPDATING THE CONFIGURATION FILE
+.LP
+If the daemon is sent a SIGUSR1, it will reinitialize itself,
+re-reading its config file from scratch. Note that if there is an
+error in the CONFIG file, the daemon will die.
+.LP
+.SH SYSLOG MESSAGES
+.LP
+tac_plus logs error messages to syslog, and informational messages to
+facility LOG_LOCAL6. Debug messages are never sent to syslog.
+.LP
+You may wish to add a line similar to the following to your
+syslog.conf file to see the informational messages logged using this
+facility.
+.nf
+
+local6.info					/var/adm/messages
+
+.fi
+.LP
+Note that in some versions of syslogd e.g. SunOS, this line must
+contain only tabs, not spaces, and that syslogd gives very little in
+the way of diagnostics when it encounters errors in the syslog.conf
+file.
+.fi
+.SH SEE ALSO
+.LP
+The tac_plus User's Guide.
+.SH FILES
+.TP 30
+.B /var/tmp/tac_plus.log
+Contains debugging output when -d is in effect.
+.TP
+.B /etc/tac_plus.pid  or /etc/tac_plus.pid.port
+contains the process id of the currently running daemon.  The port
+number is appended to the filename only if the port being used is not
+the default one of 49.
+.SH BUGS
+The configuration file syntax is too complex.
